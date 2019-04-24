@@ -1,24 +1,15 @@
 const Remittance = artifacts.require("./Remittance.sol");
+const { advanceBlock, expectedExceptionPromise } = require("./testHelpers");
 const {
-  getEventResult,
-  advanceBlock,
-  expectedExceptionPromise
-} = require("./testHelpers");
-const {
-  orderStatus,
   amountWei,
   blockExpiration,
-  password1,
-  password2,
-  passwordNew,
-  puzzleMock,
-  puzzleMockNew,
   createNewOrder,
   maxBlockExpiration,
   maxBlockExpirationNew,
   maxGas,
   invalidOrderId,
-  puzzleEmpty
+  puzzleEmpty,
+  generateMockPuzzle
 } = require("./MockData");
 
 contract("Remittance", accounts => {
@@ -27,21 +18,40 @@ contract("Remittance", accounts => {
   // prepare mock data
   // contract
   let instance;
-  let mockOrderId;
+  let mockAvailableOrder;
+  let mockExpiredOrder;
   // addresses
+  // alice is order creator
+  // carol is order receiver who uses passwords to collect fund
   const [owner, alice, carol, newAddress, unauthorized] = accounts;
 
   beforeEach(async () => {
+    // mock orders
+    mockAvailableOrder = generateMockPuzzle();
+    mockExpiredOrder = generateMockPuzzle();
     // create contract
     instance = await Remittance.new(true, maxBlockExpiration, { from: owner });
-    // add 1 mock order
-    mockOrderId = await createNewOrder(
+    // add orders to contract
+    // available order
+    mockAvailableOrder.orderId = await createNewOrder(
       instance,
       alice,
+      carol,
       amountWei,
-      puzzleMock,
+      mockAvailableOrder.puzzle,
       blockExpiration
     );
+    // expired order
+    mockExpiredOrder.orderId = await createNewOrder(
+      instance,
+      alice,
+      carol,
+      amountWei,
+      mockExpiredOrder.puzzle,
+      0
+    );
+    // skip 1 block
+    await advanceBlock();
   });
   // owner test
   it("should forbid to change owner address", () => {
@@ -53,10 +63,27 @@ contract("Remittance", accounts => {
     }, maxGas);
   });
 
-  // switch Pausable test
-  it("should forbid to switch pausable", () => {
+  // Stoppable
+  it("should forbid to call stoppable", async () => {
+    await expectedExceptionPromise(function() {
+      return instance.pause({
+        from: unauthorized,
+        gas: maxGas
+      });
+    }, maxGas);
+
+    await expectedExceptionPromise(function() {
+      return instance.resume({
+        from: unauthorized,
+        gas: maxGas
+      });
+    }, maxGas);
+  });
+
+  // kill
+  it("should forbid to call kill", () => {
     return expectedExceptionPromise(function() {
-      return instance.switchRunning(true, {
+      return instance.kill({
         from: unauthorized,
         gas: maxGas
       });
@@ -73,21 +100,27 @@ contract("Remittance", accounts => {
     }, maxGas);
   });
 
-  // puzzle must valid
-  it("should validate puzzle incorrectly", async () => {
-    const matched = await instance.isPuzzleValid(
-      password1,
-      password2,
-      puzzleMockNew
-    );
-    assert.isTrue(!matched, "should return true");
-  });
-
   // CREATE ORDER
   it("should forbid to create new order with invalid value, max block expiration, puzzle", async () => {
+    // use existing puzzle
+    await expectedExceptionPromise(function() {
+      return instance.createOrder(
+        carol,
+        mockAvailableOrder.puzzle,
+        blockExpiration,
+        {
+          from: alice,
+          value: amountWei,
+          gas: maxGas
+        }
+      );
+    }, maxGas);
+
+    // new mock data
+    const newOrderData = generateMockPuzzle();
     // zero value
     await expectedExceptionPromise(function() {
-      return instance.createOrder(puzzleMock, blockExpiration, {
+      return instance.createOrder(carol, newOrderData.puzzle, blockExpiration, {
         from: alice,
         value: 0,
         gas: maxGas
@@ -95,15 +128,20 @@ contract("Remittance", accounts => {
     }, maxGas);
     // over max block expiration
     await expectedExceptionPromise(function() {
-      return instance.createOrder(puzzleMock, maxBlockExpiration + 1, {
-        from: alice,
-        value: amountWei,
-        gas: maxGas
-      });
+      return instance.createOrder(
+        carol,
+        newOrderData.puzzle,
+        maxBlockExpiration + 1,
+        {
+          from: alice,
+          value: amountWei,
+          gas: maxGas
+        }
+      );
     }, maxGas);
     // empty puzzle
     await expectedExceptionPromise(function() {
-      return instance.createOrder(puzzleEmpty, maxBlockExpiration, {
+      return instance.createOrder(carol, puzzleEmpty, maxBlockExpiration, {
         from: alice,
         value: amountWei,
         gas: maxGas
@@ -112,149 +150,90 @@ contract("Remittance", accounts => {
   });
 
   // CLAIM ORDER
-  it("should forbid to claim order with invalid orderId, password, expired", async () => {
-    // invalid order id
+  it("should forbid to claim order with invalid password", async () => {
+    // wrong sender
     await expectedExceptionPromise(function() {
-      return instance.claimOrder(invalidOrderId, password1, password2, {
-        from: carol,
-        gas: maxGas
-      });
+      return instance.claimOrder(
+        mockAvailableOrder.password1,
+        mockAvailableOrder.password2,
+        {
+          from: unauthorized,
+          gas: maxGas
+        }
+      );
     }, maxGas);
     // invalid password1
     await expectedExceptionPromise(function() {
-      return instance.claimOrder(mockOrderId, passwordNew, password2, {
-        from: carol,
-        gas: maxGas
-      });
+      return instance.claimOrder(
+        mockAvailableOrder.password3,
+        mockAvailableOrder.password2,
+        {
+          from: carol,
+          gas: maxGas
+        }
+      );
     }, maxGas);
     // invalid password2
     await expectedExceptionPromise(function() {
-      return instance.claimOrder(mockOrderId, password1, passwordNew, {
-        from: carol,
-        gas: maxGas
-      });
-    }, maxGas);
-
-    // MAKE NEW ORDER
-    // with blockExpiration 0
-    mockOrderId = await createNewOrder(
-      instance,
-      alice,
-      amountWei,
-      puzzleMock,
-      0
-    );
-    // mine 1 block to make the order expired
-    await advanceBlock();
-    // Now Order is expired
-    // claim order
-    await expectedExceptionPromise(function() {
-      return instance.claimOrder(mockOrderId, password1, password2, {
-        from: carol,
-        gas: maxGas
-      });
+      return instance.claimOrder(
+        mockAvailableOrder.password1,
+        mockAvailableOrder.password3,
+        {
+          from: carol,
+          gas: maxGas
+        }
+      );
     }, maxGas);
   });
 
-  it("should forbid to claim order with invalid status", async () => {
+  it("should forbid to claim order with 'Claimed' status", async () => {
     // CLAIM ORDER
-    const txObj = await instance.claimOrder(mockOrderId, password1, password2, {
-      from: carol,
-      gas: maxGas
-    });
+    const txObj = await instance.claimOrder(
+      mockAvailableOrder.password1,
+      mockAvailableOrder.password2,
+      {
+        from: carol,
+        gas: maxGas
+      }
+    );
     // status
     assert.isTrue(txObj.receipt.status, "transaction status must be true");
     // claim again
     await expectedExceptionPromise(function() {
-      return instance.claimOrder(mockOrderId, password1, password2, {
-        from: carol,
-        gas: maxGas
-      });
+      return instance.claimOrder(
+        mockAvailableOrder.password1,
+        mockAvailableOrder.password2,
+        {
+          from: carol,
+          gas: maxGas
+        }
+      );
     }, maxGas);
   });
 
   // CANCEL ORDER
   it("should forbid to cancel order with invalid order id, order owner", async () => {
-    // cancel order is not expired
+    const newOrderData = generateMockPuzzle();
+    // cancel available order
     await expectedExceptionPromise(function() {
-      return instance.cancelOrder(mockOrderId, {
+      return instance.cancelOrder(mockAvailableOrder.orderId, {
         from: alice,
         gas: maxGas
       });
     }, maxGas);
-    // MAKE NEW ORDER
-    // with blockExpiration 0
-    mockOrderId = await createNewOrder(
-      instance,
-      alice,
-      amountWei,
-      puzzleMock,
-      0
-    );
-    // initial balance
-    const aliceBalance = toBN(await web3.eth.getBalance(alice));
-    // mine 1 block to make the order expired
-    await advanceBlock();
-    // now order expired
-    // CANCEL ORDER with wrong order id
+
+    // CANCEL NON EXIST ORDER with wrong order id
     await expectedExceptionPromise(function() {
       return instance.cancelOrder(invalidOrderId, {
         from: alice,
         gas: maxGas
       });
     }, maxGas);
-    // CANCEL ORDER with new account
+
+    // CANCEL EXPIRED ORDER with new account
     await expectedExceptionPromise(function() {
-      return instance.cancelOrder(mockOrderId, {
+      return instance.cancelOrder(mockExpiredOrder.orderId, {
         from: newAddress,
-        gas: maxGas
-      });
-    }, maxGas);
-  });
-
-  // CHANGE ORDER PUZZLE
-  it("should forbid to change order puzzle", async () => {
-    // invalid order id
-    await expectedExceptionPromise(function() {
-      return instance.changePuzzle(invalidOrderId, puzzleMockNew, {
-        from: alice,
-        gas: maxGas
-      });
-    }, maxGas);
-
-    // invalid puzzle
-    await expectedExceptionPromise(function() {
-      return instance.changePuzzle(mockOrderId, puzzleEmpty, {
-        from: alice,
-        gas: maxGas
-      });
-    }, maxGas);
-
-    // invalid order owner
-    await expectedExceptionPromise(function() {
-      return instance.changePuzzle(mockOrderId, puzzleMockNew, {
-        from: newAddress,
-        gas: maxGas
-      });
-    }, maxGas);
-
-    // MAKE NEW ORDER
-    // with blockExpiration 0
-    mockOrderId = await createNewOrder(
-      instance,
-      alice,
-      amountWei,
-      puzzleMock,
-      0
-    );
-    // initial balance
-    const aliceBalance = toBN(await web3.eth.getBalance(alice));
-    // mine 1 block to make the order expired
-    await advanceBlock();
-    // Now order expired
-    await expectedExceptionPromise(function() {
-      return instance.changePuzzle(mockOrderId, puzzleMockNew, {
-        from: alice,
         gas: maxGas
       });
     }, maxGas);

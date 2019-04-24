@@ -145,13 +145,21 @@ const revertToSnapShot = id => {
     );
   });
 };
-
 const advanceTimeAndBlock = async time => {
   await advanceTime(time);
   await advanceBlock();
   return Promise.resolve(web3.eth.getBlock("latest"));
 };
-
+const randomString = length => {
+  var result = "";
+  var characters =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  var charactersLength = characters.length;
+  for (var i = 0; i < length; i++) {
+    result += characters.charAt(Math.floor(Math.random() * charactersLength));
+  }
+  return result;
+};
 module.exports = {
   advanceTime,
   advanceBlock,
@@ -159,5 +167,6 @@ module.exports = {
   takeSnapshot,
   revertToSnapShot,
   getEventResult,
-  expectedExceptionPromise
+  expectedExceptionPromise,
+  randomString
 };

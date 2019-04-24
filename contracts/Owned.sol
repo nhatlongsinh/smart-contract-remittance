@@ -2,11 +2,11 @@ pragma solidity >=0.4.21 <0.6.0;
 
 contract Owned {
   // owner
-  address private _owner;
+  address payable internal _owner;
 
   // event
   event ChangeOwnerEvent(
-    address indexed oldOwner,
+    address indexed sender,
     address indexed newOwner
   );
 
@@ -19,7 +19,9 @@ contract Owned {
 
   // modifier
   modifier ownerOnly() {
-    require(_owner == msg.sender);
+    require(_owner == msg.sender,
+      "Only the owner can call this function!"
+    );
     _;
   }
 
@@ -29,11 +31,13 @@ contract Owned {
   }
 
   // change owner
-  function changeOwner(address newOwner)
+  function changeOwner(address payable newOwner)
     public
     ownerOnly
   {
-    require(_owner != newOwner && newOwner != address(0x0));
+    require(_owner != newOwner && newOwner != address(0x0),
+      "New address must be valid"
+    );
     _owner = newOwner;
     emit ChangeOwnerEvent(msg.sender, newOwner);
   }
