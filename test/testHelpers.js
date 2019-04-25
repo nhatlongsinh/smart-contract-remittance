@@ -1,4 +1,5 @@
 "use strict";
+const { soliditySha3, asciiToHex, padRight } = web3.utils;
 /**
  * @param {!Function.<!Promise>} action.
  * @param {!Number | !string | !BigNumber} gasToUse.
@@ -160,6 +161,24 @@ const randomString = length => {
   }
   return result;
 };
+const generateMockPuzzle = receiver => {
+  // random password
+  const correctPassword = padRight(asciiToHex(randomString(32)), 64);
+  const wrongPassword = padRight(asciiToHex(randomString(32)), 64);
+  // puzzle
+  const puzzle = soliditySha3(
+    { type: "address", value: receiver },
+    { type: "bytes32", value: correctPassword }
+  );
+
+  return {
+    correctPassword,
+    wrongPassword,
+    receiver,
+    puzzle
+  };
+};
+
 module.exports = {
   advanceTime,
   advanceBlock,
@@ -168,5 +187,6 @@ module.exports = {
   revertToSnapShot,
   getEventResult,
   expectedExceptionPromise,
-  randomString
+  randomString,
+  generateMockPuzzle
 };
