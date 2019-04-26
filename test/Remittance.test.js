@@ -2,14 +2,16 @@ const Remittance = artifacts.require("./Remittance.sol");
 const {
   getEventResult,
   advanceBlock,
-  generateMockPuzzle
+  generateMockPuzzle,
+  expectedExceptionPromise
 } = require("./testHelpers");
+
 const {
-  orderStatus,
   amountWei,
   blockExpiration,
   maxBlockExpiration,
-  maxBlockExpirationNew
+  maxBlockExpirationNew,
+  maxGas
 } = require("./MockData");
 
 contract("Remittance", accounts => {
@@ -17,18 +19,16 @@ contract("Remittance", accounts => {
   const { toBN } = web3.utils;
   //prepare mock data
   let instance;
+
+  if (accounts.length < 7) throw Error("Accounts is not enough");
+
   const [contractOwner, orderCreator, orderReceiver, newAddress] = accounts;
 
-  const createNewOrder = async (orderReceiver, puzzle, blockExpiration) => {
-    const txObj = await instance.createOrder(
-      orderReceiver,
-      puzzle,
-      blockExpiration,
-      {
-        from: orderCreator,
-        value: amountWei
-      }
-    );
+  const createNewOrder = async (puzzle, blockExpiration) => {
+    const txObj = await instance.createOrder(puzzle, blockExpiration, {
+      from: orderCreator,
+      value: amountWei
+    });
     assert.isTrue(txObj.receipt.status, "Cannot create order");
     return txObj.receipt.status;
   };
@@ -77,6 +77,17 @@ contract("Remittance", accounts => {
       from: contractOwner
     });
     assert.strictEqual(newRunning, false, "it should pause");
+
+    // mock data
+    const mockOrder = await generateMockPuzzle(orderReceiver, instance);
+    // cannot call paused function
+
+    await expectedExceptionPromise(function() {
+      return instance.createOrder(mockOrder.puzzle, 1, {
+        from: contractOwner,
+        gas: maxGas
+      });
+    }, maxGas);
   });
   // resume
   it("should resume", async () => {
@@ -132,25 +143,13 @@ contract("Remittance", accounts => {
     );
   });
 
-  // UNIT TEST SHA
-  // generate correct SHA
-  it("should generate correct puzzle", async () => {
-    // mock
-    const mockOrder = generateMockPuzzle(orderReceiver);
-    const puzzleContract = await instance.generatePuzzle.call(
-      mockOrder.receiver,
-      mockOrder.correctPassword
-    );
-    // test
-    assert.strictEqual(mockOrder.puzzle, puzzleContract, "puzzle must match");
-  });
   //KILL contract
   it("should kill contract and transfer balance to owner", async () => {
     // add new order
     // mock data
-    const mockOrder = generateMockPuzzle(orderReceiver);
+    const mockOrder = await generateMockPuzzle(orderReceiver, instance);
     // add new order
-    await createNewOrder(mockOrder.receiver, mockOrder.puzzle, blockExpiration);
+    await createNewOrder(mockOrder.puzzle, blockExpiration);
     // contract balance
     const contractBalance = toBN(await web3.eth.getBalance(instance.address));
     // owner balance
@@ -189,10 +188,9 @@ contract("Remittance", accounts => {
   //CREATE ORDER
   it("should create new order", async () => {
     // new mock data
-    const newOrderData = generateMockPuzzle(orderReceiver);
+    const newOrderData = await generateMockPuzzle(orderReceiver, instance);
     // new order
     const txObj = await instance.createOrder(
-      newOrderData.receiver,
       newOrderData.puzzle,
       blockExpiration,
       {
@@ -227,7 +225,6 @@ contract("Remittance", accounts => {
       amountWei.toString(),
       "amount"
     );
-    assert.strictEqual(newOrder.status.toString(), orderStatus.Available);
     assert.strictEqual(
       newOrder.expiredBlock.toString(),
       expiredBlock.toString(),
@@ -239,9 +236,9 @@ contract("Remittance", accounts => {
   // orderReceiver claim fund from mock Order using password1 & password2
   it("should claim order", async () => {
     // mock data
-    const mockOrder = generateMockPuzzle(orderReceiver);
+    const mockOrder = await generateMockPuzzle(orderReceiver, instance);
     // add new order
-    await createNewOrder(mockOrder.receiver, mockOrder.puzzle, blockExpiration);
+    await createNewOrder(mockOrder.puzzle, blockExpiration);
 
     // initial balance
     const creatorBalance = toBN(await web3.eth.getBalance(orderReceiver));
@@ -256,7 +253,7 @@ contract("Remittance", accounts => {
     const event = getEventResult(txObj, "ClaimOrderEvent");
     assert.isDefined(event, "it should emit ClaimOrderEvent");
     // assert event
-    assert.strictEqual(event.orderId, mockOrder.puzzle, "order id");
+    assert.strictEqual(event.puzzle, mockOrder.puzzle, "order id");
     assert.strictEqual(event.sender, mockOrder.receiver, "sender");
     assert.strictEqual(event.password, mockOrder.correctPassword, "password");
     assert.strictEqual(event.amount.toString(), amountWei.toString(), "amount");
@@ -265,8 +262,13 @@ contract("Remittance", accounts => {
     const claimedOrder = await instance.getOrder.call(mockOrder.puzzle, {
       from: orderCreator
     });
-    // status must be Claimed
-    assert.strictEqual(claimedOrder.status.toString(), orderStatus.Claimed);
+    // amount and expiredblock set to zero
+    assert.strictEqual(claimedOrder.amount.toString(), "0", "amount");
+    assert.strictEqual(
+      claimedOrder.expiredBlock.toString(),
+      "0",
+      "expiredBlock"
+    );
 
     // assert balance
     // get transaction gas price
@@ -290,9 +292,9 @@ contract("Remittance", accounts => {
   // order creator cancel order and get the refund
   it("should cancel order", async () => {
     // mock data
-    const mockOrder = generateMockPuzzle(orderReceiver);
+    const mockOrder = await generateMockPuzzle(orderReceiver, instance);
     // add new order that expire in the next block
-    await createNewOrder(mockOrder.receiver, mockOrder.puzzle, 0);
+    await createNewOrder(mockOrder.puzzle, 0);
     // skip 1 block => order will be expired
     await advanceBlock();
     // get initial balance
@@ -307,18 +309,19 @@ contract("Remittance", accounts => {
     const event = getEventResult(txObj, "CancelOrderEvent");
     assert.isDefined(event, "it should emit CancelOrderEvent");
     // assert event
-    assert.strictEqual(event.orderId, mockOrder.puzzle, "orderId");
+    assert.strictEqual(event.puzzle, mockOrder.puzzle, "puzzle");
     assert.strictEqual(event.sender, orderCreator, "owner");
 
     // assert data
     const CancelledOrder = await instance.getOrder.call(mockOrder.puzzle, {
       from: orderCreator
     });
-    // status must be Cancelled
+    // amount and expiredblock set to zero
+    assert.strictEqual(CancelledOrder.amount.toString(), "0", "amount");
     assert.strictEqual(
-      CancelledOrder.status.toString(),
-      orderStatus.Cancelled,
-      "status"
+      CancelledOrder.expiredBlock.toString(),
+      "0",
+      "expiredBlock"
     );
 
     // assert balance

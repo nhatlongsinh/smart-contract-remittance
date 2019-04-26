@@ -21,11 +21,12 @@ contract Remittance is Stoppable {
         uint256 amount;
         uint256 expiredBlock;
         address creator;
-        address receiver;
-        OrderStatus status;
     }
 
     // PRIVATE VARIABLES
+    // secret key to help contracts using this code can generate unique puzzle
+    // even if they use the same password & sender
+    bytes32 private _secretKey;
     // maximum number of blocks
     // limit to how far in the future the deadline can be 
     uint256 private _maxBlockExpiration;
@@ -43,14 +44,14 @@ contract Remittance is Stoppable {
     );
     // claim order event
     event ClaimOrderEvent(
-        bytes32 indexed orderId, // puzzle
+        bytes32 indexed puzzle, 
         address indexed sender, // as receiver
         uint256 amount,
         bytes32 password
     );
     // cancel order event
     event CancelOrderEvent(
-        bytes32 indexed orderId,
+        bytes32 indexed puzzle,
         address indexed sender // as creator
     );
     // set max block expiration
@@ -59,20 +60,13 @@ contract Remittance is Stoppable {
         uint256 newValue
     );
 
-    // MODIFIER
-    // block expiration
-    modifier blockExpirationValidOnly(uint256 blockExpiration)
-    {
-        require(blockExpiration <= _maxBlockExpiration,
-            "Block Expiration must less than max block expiration"
-        );
-        _;
-    }
-
     // constructor
     constructor(bool isRunning, uint256 maxBlockExpiration) public Stoppable(isRunning)
     {
         _maxBlockExpiration = maxBlockExpiration;
+        _secretKey = keccak256(
+            abi.encodePacked(msg.sender, block.number)
+        );
     }
 
     // PUBLIC METHODS
@@ -83,23 +77,21 @@ contract Remittance is Stoppable {
     }
     // Get order with
     // valid order id
-    function getOrder(bytes32 orderId) public view
+    function getOrder(bytes32 puzzle) public view
         returns(
             address creator,
             uint256 amount,
-            uint256 expiredBlock,
-            OrderStatus status
+            uint256 expiredBlock
         )
     {
-        Order memory order = _orderOf[orderId];
+        Order memory order = _orderOf[puzzle];
 
-        require(order.status != OrderStatus.Not_Set, "Order not found");
+        require(order.creator != address(0x0), "Order not found");
 
         // return
         creator = order.creator;
         amount = order.amount;
         expiredBlock = order.expiredBlock;
-        status = order.status;
     }
 
     // SETTERs
@@ -115,20 +107,21 @@ contract Remittance is Stoppable {
     // valid puzzle
     // value > 0
     // deadline < maxDeadline
-    function createOrder(address receiver, bytes32 puzzle, uint256 blockExpiration)
+    function createOrder(bytes32 puzzle, uint256 blockExpiration)
         public
         payable
         runningOnly
-        blockExpirationValidOnly(blockExpiration)
     {
         // validate inputs
         require(puzzle != 0, "Invalid Puzzle");
         require(msg.value > 0, "Ether amount must greater than zero");
-        require(receiver != address(0x0), "Invalid receiver");
+        require(blockExpiration <= _maxBlockExpiration,
+            "Block Expiration must less than max block expiration"
+        );
 
         Order storage newOrder = _orderOf[puzzle];
 
-        require(newOrder.status == OrderStatus.Not_Set, "Puzzle already exist");
+        require(newOrder.creator == address(0x0), "Puzzle already exist");
 
         // CREATE
         // expired Block
@@ -138,8 +131,6 @@ contract Remittance is Stoppable {
         newOrder.amount= msg.value;
         newOrder.expiredBlock= expiredBlock;
         newOrder.creator= msg.sender;
-        newOrder.receiver= receiver;
-        newOrder.status= OrderStatus.Available;
 
         // event
         emit NewOrderEvent(msg.sender, msg.value, expiredBlock, puzzle);
@@ -158,13 +149,15 @@ contract Remittance is Stoppable {
         // get order
         Order memory order = _orderOf[puzzle];
 
-        require(order.status == OrderStatus.Available, "Order not available");
+        require(order.creator != address(0x0), "Order not available");
 
-        // set status
-        _orderOf[puzzle].status = OrderStatus.Claimed;
+        require(order.amount > 0, "Order is empty");
 
         // event
         emit ClaimOrderEvent(puzzle, msg.sender, order.amount, password);
+
+        _orderOf[puzzle].amount = 0;
+        _orderOf[puzzle].expiredBlock = 0;
 
         // transfer
         msg.sender.transfer(order.amount);
@@ -174,28 +167,28 @@ contract Remittance is Stoppable {
     // valid order Id
     // status = Available
     // right owner
-    function cancelOrder(bytes32 orderId) public runningOnly
+    function cancelOrder(bytes32 puzzle) public runningOnly
     {
         // get order
-        Order memory order = _orderOf[orderId];
-        require(order.status == OrderStatus.Available, "Order not available");
+        Order memory order = _orderOf[puzzle];
+        require(order.creator != address(0x0), "Order not available");
 
         require(order.creator == msg.sender,
             "Only order creator to cancel order"
         );
 
-        require(order.status == OrderStatus.Available,
-            "Only cancel available order"
-        );
+        require(order.amount > 0, "Order is empty");
 
         require(block.number > order.expiredBlock,
             "Only cancel expired order"
         );
 
-        _orderOf[orderId].status = OrderStatus.Cancelled;
-
         // event
-        emit CancelOrderEvent(orderId, msg.sender);
+        emit CancelOrderEvent(puzzle, msg.sender);
+
+        _orderOf[puzzle].amount = 0;
+        _orderOf[puzzle].expiredBlock = 0;
+
         // refund
         msg.sender.transfer(order.amount);
     }
@@ -203,11 +196,11 @@ contract Remittance is Stoppable {
     // generate puzzle
     function generatePuzzle(address receiver, bytes32 password)
         public
-        pure
+        view
         returns(bytes32 puzzle)
     {
         puzzle = keccak256(
-            abi.encodePacked(receiver, password)
+            abi.encodePacked(receiver, password, _secretKey)
         );
     }
 }

@@ -161,14 +161,22 @@ const randomString = length => {
   }
   return result;
 };
-const generateMockPuzzle = receiver => {
+const generateMockPuzzle = async (receiver, contractInstance) => {
   // random password
   const correctPassword = padRight(asciiToHex(randomString(32)), 64);
   const wrongPassword = padRight(asciiToHex(randomString(32)), 64);
   // puzzle
-  const puzzle = soliditySha3(
-    { type: "address", value: receiver },
-    { type: "bytes32", value: correctPassword }
+  // const puzzle = soliditySha3(
+  //   { type: "address", value: receiver },
+  //   { type: "bytes32", value: correctPassword }
+  // );
+
+  const puzzle = await contractInstance.generatePuzzle.call(
+    receiver,
+    correctPassword,
+    {
+      from: receiver
+    }
   );
 
   return {
