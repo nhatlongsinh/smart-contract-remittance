@@ -1,6 +1,6 @@
 const { expectedExceptionPromise } = require("./testHelpers");
 const Remittance = artifacts.require("./Remittance.sol");
-const { advanceBlock, generateMockPuzzle } = require("./testHelpers");
+const { advanceBlocks, generateMockPuzzle } = require("./testHelpers");
 const {
   amountWei,
   blockExpiration,
@@ -14,13 +14,10 @@ contract("Remittance Forbidden", accounts => {
   //prepare mock data
   let instance;
 
-  if (accounts.length < 7) throw Error("Accounts is not enough");
-
   const [
     contractOwner,
     orderCreator,
     orderReceiver,
-    orderReceiver2,
     unauthorized,
     newAddress,
     invalidOrderId
@@ -36,12 +33,13 @@ contract("Remittance Forbidden", accounts => {
   };
 
   beforeEach(async () => {
+    assert.isTrue(accounts.length >= 6, "Accounts is not enough");
     //create contract
     instance = await Remittance.new(true, maxBlockExpiration, {
       from: contractOwner
     });
   });
-  // owner test
+
   it("should forbid to change owner address", () => {
     return expectedExceptionPromise(function() {
       return instance.changeOwner(newAddress, {
@@ -51,7 +49,6 @@ contract("Remittance Forbidden", accounts => {
     }, maxGas);
   });
 
-  // Stoppable
   it("should forbid to call stoppable", async () => {
     // pause
     await expectedExceptionPromise(function() {
@@ -69,7 +66,6 @@ contract("Remittance Forbidden", accounts => {
     }, maxGas);
   });
 
-  // kill
   it("should forbid to call kill", () => {
     return expectedExceptionPromise(function() {
       return instance.kill({
@@ -79,7 +75,6 @@ contract("Remittance Forbidden", accounts => {
     }, maxGas);
   });
 
-  // set block expiration test
   it("should forbid to set block expiration", () => {
     return expectedExceptionPromise(function() {
       return instance.setMaxBlockExpiration(maxBlockExpirationNew, {
@@ -89,7 +84,6 @@ contract("Remittance Forbidden", accounts => {
     }, maxGas);
   });
 
-  // CREATE ORDER
   it("should forbid to create new order with existed puzzle", async () => {
     //mock data
     const mockOrder = await generateMockPuzzle(orderReceiver, instance);
@@ -135,7 +129,6 @@ contract("Remittance Forbidden", accounts => {
     }, maxGas);
   });
 
-  // CLAIM ORDER
   it("should forbid to claim order with wrong sender, invalid password", async () => {
     //mock data
     const mockOrder = await generateMockPuzzle(orderReceiver, instance);
@@ -159,7 +152,7 @@ contract("Remittance Forbidden", accounts => {
     }, maxGas);
   });
 
-  it("should forbid to claim order with 'Claimed' status", async () => {
+  it("should forbid to claim order with that has zero amount", async () => {
     //mock data
     const mockOrder = await generateMockPuzzle(orderReceiver, instance);
     // add new order
@@ -180,8 +173,7 @@ contract("Remittance Forbidden", accounts => {
     }, maxGas);
   });
 
-  // CANCEL ORDER
-  it("should forbid to cancel available order or wrong order id", async () => {
+  it("should forbid to cancel available order or wrong puzzle", async () => {
     //mock data
     const mockOrder = await generateMockPuzzle(orderReceiver, instance);
     // add new order
@@ -194,7 +186,7 @@ contract("Remittance Forbidden", accounts => {
       });
     }, maxGas);
 
-    // CANCEL NON EXIST ORDER with wrong order id
+    // CANCEL NON EXIST ORDER with wrong puzzle
     await expectedExceptionPromise(function() {
       return instance.cancelOrder(invalidOrderId, {
         from: orderCreator,
@@ -202,14 +194,15 @@ contract("Remittance Forbidden", accounts => {
       });
     }, maxGas);
   });
+
   it("should forbid to cancel order with wrong creator", async () => {
     //mock data
     const mockOrder = await generateMockPuzzle(orderReceiver, instance);
     // add new order that expire in the next block
-    await createNewOrder(mockOrder.puzzle, 0);
-    // skip 1 block => order expired
+    await createNewOrder(mockOrder.puzzle, 1);
+    // skip 2 block => order expired
     // cancel available order
-    await advanceBlock();
+    await advanceBlocks(2);
 
     await expectedExceptionPromise(function() {
       return instance.cancelOrder(mockOrder.puzzle, {

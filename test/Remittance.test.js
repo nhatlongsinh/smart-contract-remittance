@@ -1,7 +1,7 @@
 const Remittance = artifacts.require("./Remittance.sol");
 const {
   getEventResult,
-  advanceBlock,
+  advanceBlocks,
   generateMockPuzzle,
   expectedExceptionPromise
 } = require("./testHelpers");
@@ -20,8 +20,6 @@ contract("Remittance", accounts => {
   //prepare mock data
   let instance;
 
-  if (accounts.length < 7) throw Error("Accounts is not enough");
-
   const [contractOwner, orderCreator, orderReceiver, newAddress] = accounts;
 
   const createNewOrder = async (puzzle, blockExpiration) => {
@@ -34,12 +32,13 @@ contract("Remittance", accounts => {
   };
 
   beforeEach(async () => {
+    assert.isTrue(accounts.length >= 4, "Accounts is not enough");
     //create contract
     instance = await Remittance.new(true, maxBlockExpiration, {
       from: contractOwner
     });
   });
-  // owner test
+
   it("should allow owner to change owner address", async () => {
     const txObj = await instance.changeOwner(newAddress, {
       from: contractOwner
@@ -50,7 +49,7 @@ contract("Remittance", accounts => {
     const event = getEventResult(txObj, "ChangeOwnerEvent");
     assert.isDefined(event, "it should emit ChangeOwnerEvent");
     // owner changed
-    assert.strictEqual(event.sender, contractOwner, "it should change owner");
+    assert.strictEqual(event.sender, contractOwner, "sender");
     assert.strictEqual(event.newOwner, newAddress, "it should change owner");
 
     // assert data
@@ -60,7 +59,6 @@ contract("Remittance", accounts => {
     assert.strictEqual(savedOwner, newAddress, "it should change owner");
   });
 
-  // Stoppable
   it("should pause", async () => {
     const txObj = await instance.pause({
       from: contractOwner
@@ -89,7 +87,7 @@ contract("Remittance", accounts => {
       });
     }, maxGas);
   });
-  // resume
+
   it("should resume", async () => {
     // create contract with pause
     instance = await Remittance.new(false, maxBlockExpiration, {
@@ -115,7 +113,6 @@ contract("Remittance", accounts => {
     assert.strictEqual(newRunning, true, "it should resume");
   });
 
-  // set block expiration test
   it("should allow to set block expiration", async () => {
     const txObj = await instance.setMaxBlockExpiration(maxBlockExpirationNew, {
       from: contractOwner
@@ -143,9 +140,7 @@ contract("Remittance", accounts => {
     );
   });
 
-  //KILL contract
   it("should kill contract and transfer balance to owner", async () => {
-    // add new order
     // mock data
     const mockOrder = await generateMockPuzzle(orderReceiver, instance);
     // add new order
@@ -185,7 +180,6 @@ contract("Remittance", accounts => {
     );
   });
 
-  //CREATE ORDER
   it("should create new order", async () => {
     // new mock data
     const newOrderData = await generateMockPuzzle(orderReceiver, instance);
@@ -232,16 +226,13 @@ contract("Remittance", accounts => {
     );
   });
 
-  // CLAIM ORDER
-  // orderReceiver claim fund from mock Order using password1 & password2
   it("should claim order", async () => {
     // mock data
     const mockOrder = await generateMockPuzzle(orderReceiver, instance);
     // add new order
     await createNewOrder(mockOrder.puzzle, blockExpiration);
 
-    // initial balance
-    const creatorBalance = toBN(await web3.eth.getBalance(orderReceiver));
+    const initialBalance = toBN(await web3.eth.getBalance(orderReceiver));
 
     // CLAIM ORDER
     const txObj = await instance.claimOrder(mockOrder.correctPassword, {
@@ -279,7 +270,7 @@ contract("Remittance", accounts => {
     //new balance
     const creatorBalanceNew = toBN(await web3.eth.getBalance(orderReceiver));
     // calculate received amount
-    const creatorReceived = creatorBalanceNew.add(txCost).sub(creatorBalance);
+    const creatorReceived = creatorBalanceNew.add(txCost).sub(initialBalance);
     // test amount received must be correct
     assert.strictEqual(
       amountWei.toString(),
@@ -288,17 +279,15 @@ contract("Remittance", accounts => {
     );
   });
 
-  // CANCEL ORDER
-  // order creator cancel order and get the refund
   it("should cancel order", async () => {
     // mock data
     const mockOrder = await generateMockPuzzle(orderReceiver, instance);
     // add new order that expire in the next block
-    await createNewOrder(mockOrder.puzzle, 0);
-    // skip 1 block => order will be expired
-    await advanceBlock();
-    // get initial balance
-    const creatorBalance = toBN(await web3.eth.getBalance(orderCreator));
+    await createNewOrder(mockOrder.puzzle, 1);
+    // skip 2 block => order will be expired
+    await advanceBlocks(2);
+
+    const initialBalance = toBN(await web3.eth.getBalance(orderCreator));
     // CANCEL ORDER
     const txObj = await instance.cancelOrder(mockOrder.puzzle, {
       from: orderCreator
@@ -333,7 +322,7 @@ contract("Remittance", accounts => {
     //new balance
     const creatorBalanceNew = toBN(await web3.eth.getBalance(orderCreator));
     // calculate received amount
-    const creatorReceived = creatorBalanceNew.add(txCost).sub(creatorBalance);
+    const creatorReceived = creatorBalanceNew.add(txCost).sub(initialBalance);
     // test amount received must be correct
     assert.strictEqual(
       amountWei.toString(),

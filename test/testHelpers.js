@@ -110,6 +110,12 @@ const advanceBlock = () => {
   });
 };
 
+const advanceBlocks = async num => {
+  for (let i = 0; i < num; i++) {
+    await advanceBlock();
+  }
+};
+
 const takeSnapshot = () => {
   return new Promise((resolve, reject) => {
     web3.currentProvider.send(
@@ -196,5 +202,6 @@ module.exports = {
   getEventResult,
   expectedExceptionPromise,
   randomString,
-  generateMockPuzzle
+  generateMockPuzzle,
+  advanceBlocks
 };
