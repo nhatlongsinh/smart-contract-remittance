@@ -34,26 +34,25 @@ contract Remittance is Stoppable {
 
     // EVENTS
     // new order event
-    event NewOrderEvent(
+    event OrderCreated(
         address indexed sender, // as creator
         uint256 amount,
         uint256 expiredBlock,
         bytes32 indexed puzzle
     );
     // claim order event
-    event ClaimOrderEvent(
+    event OrderClaimed(
         bytes32 indexed puzzle, 
         address indexed sender, // as receiver
-        uint256 amount,
         bytes32 password
     );
     // cancel order event
-    event CancelOrderEvent(
+    event OrderCancelled(
         bytes32 indexed puzzle,
         address indexed sender // as creator
     );
     // set max block expiration
-    event SetMaxBlockExpirationEvent(
+    event MaxBlockExpirationChanged(
         address indexed sender,
         uint256 newValue
     );
@@ -70,7 +69,7 @@ contract Remittance is Stoppable {
     {
         require(max > 0, "Value must greater than zero");
         maxBlockExpiration = max;
-        emit SetMaxBlockExpirationEvent(msg.sender, max);
+        emit MaxBlockExpirationChanged(msg.sender, max);
     }
 
     // Create order with valid puzzle
@@ -101,25 +100,24 @@ contract Remittance is Stoppable {
         newOrder.creator= msg.sender;
 
         // event
-        emit NewOrderEvent(msg.sender, msg.value, expiredBlock, puzzle);
+        emit OrderCreated(msg.sender, msg.value, expiredBlock, puzzle);
     }
 
     // Claim order with password
     function claimOrder(bytes32 password) public runningOnly
     {
-        // generate puzzle
         bytes32 puzzle = generatePuzzle(msg.sender, password);
 
-        // get order
-        require(orders[puzzle].creator != address(0x0), "Order not available");
-        uint256 balance =orders[puzzle].amount;
+        Order storage order = orders[puzzle];
+
+        uint256 balance = order.amount;
         require(balance > 0, "Order is empty");
 
-        orders[puzzle].amount = 0;
-        orders[puzzle].expiredBlock = 0;
+        order.amount = 0;
+        order.expiredBlock = 0;
 
         // event
-        emit ClaimOrderEvent(puzzle, msg.sender, balance, password);
+        emit OrderClaimed(puzzle, msg.sender, password);
 
         // transfer
         msg.sender.transfer(balance);
@@ -141,11 +139,11 @@ contract Remittance is Stoppable {
             "Only cancel expired order"
         );
 
-        // event
-        emit CancelOrderEvent(puzzle, msg.sender);
-
         orders[puzzle].amount = 0;
         orders[puzzle].expiredBlock = 0;
+
+        // event
+        emit OrderCancelled(puzzle, msg.sender);
 
         // refund
         msg.sender.transfer(order.amount);

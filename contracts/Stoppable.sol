@@ -7,9 +7,9 @@ contract Stoppable is Owned {
   bool private _isRunning;
 
   // event
-  event PauseEvent(address sender);
-  event ResumeEvent(address sender);
-  event KillEvent(address sender);
+  event ContractPaused(address sender);
+  event ContractResumed(address sender);
+  event ContractKilled(address sender);
 
   // constructor
   constructor(bool isRunning) public {
@@ -35,7 +35,7 @@ contract Stoppable is Owned {
     ownerOnly
   {
     _isRunning = false;
-    emit PauseEvent(msg.sender);
+    emit ContractPaused(msg.sender);
   }
   // set running
   function resume()
@@ -43,14 +43,14 @@ contract Stoppable is Owned {
     ownerOnly
   {
     _isRunning = true;
-    emit ResumeEvent(msg.sender);
+    emit ContractResumed(msg.sender);
   }
   // kill
   function kill()
     public
     ownerOnly
   {
-    emit KillEvent(msg.sender);
+    emit ContractKilled(msg.sender);
     // send all balance to contract owner
     selfdestruct(_owner);
   }

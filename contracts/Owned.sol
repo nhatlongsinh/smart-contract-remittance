@@ -5,7 +5,7 @@ contract Owned {
   address payable internal _owner;
 
   // event
-  event ChangeOwnerEvent(
+  event OwnerChanged(
     address indexed sender,
     address indexed newOwner
   );
@@ -14,7 +14,7 @@ contract Owned {
   constructor() public {
     _owner = msg.sender;
 
-    emit ChangeOwnerEvent(address(0x0), _owner);
+    emit OwnerChanged(address(0x0), _owner);
   }
 
   // modifier
@@ -39,6 +39,6 @@ contract Owned {
       "New address must be valid"
     );
     _owner = newOwner;
-    emit ChangeOwnerEvent(msg.sender, newOwner);
+    emit OwnerChanged(msg.sender, newOwner);
   }
 }

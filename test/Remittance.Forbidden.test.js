@@ -14,14 +14,12 @@ contract("Remittance Forbidden", accounts => {
   //prepare mock data
   let instance;
 
-  const [
-    contractOwner,
+  let contractOwner,
     orderCreator,
     orderReceiver,
     unauthorized,
     newAddress,
-    invalidOrderId
-  ] = accounts;
+    invalidOrderId;
 
   const createNewOrder = async (puzzle, blockExpiration) => {
     const txObj = await instance.createOrder(puzzle, blockExpiration, {
@@ -33,6 +31,14 @@ contract("Remittance Forbidden", accounts => {
   };
   before(() => {
     assert.isTrue(accounts.length >= 6, "Accounts is not enough");
+    [
+      contractOwner,
+      orderCreator,
+      orderReceiver,
+      unauthorized,
+      newAddress,
+      invalidOrderId
+    ] = accounts;
   });
   beforeEach(async () => {
     //create contract
