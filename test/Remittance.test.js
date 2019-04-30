@@ -31,8 +31,10 @@ contract("Remittance", accounts => {
     return txObj.receipt.status;
   };
 
-  beforeEach(async () => {
+  before(() => {
     assert.isTrue(accounts.length >= 4, "Accounts is not enough");
+  });
+  beforeEach(async () => {
     //create contract
     instance = await Remittance.new(true, maxBlockExpiration, {
       from: contractOwner
@@ -210,7 +212,7 @@ contract("Remittance", accounts => {
     );
 
     // assert data
-    const newOrder = await instance.getOrder.call(newOrderData.puzzle, {
+    const newOrder = await instance.orders.call(newOrderData.puzzle, {
       from: orderCreator
     });
     assert.strictEqual(newOrder.creator, orderCreator, "creator");
@@ -250,7 +252,7 @@ contract("Remittance", accounts => {
     assert.strictEqual(event.amount.toString(), amountWei.toString(), "amount");
 
     // assert data
-    const claimedOrder = await instance.getOrder.call(mockOrder.puzzle, {
+    const claimedOrder = await instance.orders.call(mockOrder.puzzle, {
       from: orderCreator
     });
     // amount and expiredblock set to zero
@@ -302,7 +304,7 @@ contract("Remittance", accounts => {
     assert.strictEqual(event.sender, orderCreator, "owner");
 
     // assert data
-    const CancelledOrder = await instance.getOrder.call(mockOrder.puzzle, {
+    const CancelledOrder = await instance.orders.call(mockOrder.puzzle, {
       from: orderCreator
     });
     // amount and expiredblock set to zero

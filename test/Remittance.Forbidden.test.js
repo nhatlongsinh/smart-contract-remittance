@@ -31,9 +31,10 @@ contract("Remittance Forbidden", accounts => {
     assert.isTrue(txObj.receipt.status, "Cannot create order");
     return txObj.receipt.status;
   };
-
-  beforeEach(async () => {
+  before(() => {
     assert.isTrue(accounts.length >= 6, "Accounts is not enough");
+  });
+  beforeEach(async () => {
     //create contract
     instance = await Remittance.new(true, maxBlockExpiration, {
       from: contractOwner

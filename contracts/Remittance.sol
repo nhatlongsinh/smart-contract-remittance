@@ -27,10 +27,10 @@ contract Remittance is Stoppable {
     // PRIVATE VARIABLES
     // maximum number of blocks
     // limit to how far in the future the deadline can be 
-    uint256 private _maxBlockExpiration;
+    uint256 public maxBlockExpiration;
     // list of orders by order Id
     // Order Id is puzzle
-    mapping(bytes32 => Order) _orderOf;
+    mapping(bytes32 => Order) public orders;
 
     // EVENTS
     // new order event
@@ -59,25 +59,9 @@ contract Remittance is Stoppable {
     );
 
     // constructor
-    constructor(bool isRunning, uint256 maxBlockExpiration) public Stoppable(isRunning)
+    constructor(bool isRunning, uint256 _maxBlockExpiration) public Stoppable(isRunning)
     {
-        _maxBlockExpiration = maxBlockExpiration;
-    }
-
-    // PUBLIC METHODS
-    // GETTERs
-    // max block expiration
-    function maxBlockExpiration() public view returns (uint256) {
-        return _maxBlockExpiration;
-    }
-    // Get order with
-    // valid order id
-    function getOrder(bytes32 puzzle) public view
-        returns(
-            Order memory order
-        )
-    {
-        order = _orderOf[puzzle];
+        maxBlockExpiration = _maxBlockExpiration;
     }
 
     // SETTERs
@@ -85,7 +69,7 @@ contract Remittance is Stoppable {
     function setMaxBlockExpiration(uint256 max) public ownerOnly
     {
         require(max > 0, "Value must greater than zero");
-        _maxBlockExpiration = max;
+        maxBlockExpiration = max;
         emit SetMaxBlockExpirationEvent(msg.sender, max);
     }
 
@@ -99,11 +83,11 @@ contract Remittance is Stoppable {
         require(puzzle != 0, "Invalid Puzzle");
         require(msg.value > 0, "Ether amount must greater than zero");
         require(blockExpiration > 0, "Block Expiration must greater than zero");
-        require(blockExpiration <= _maxBlockExpiration,
+        require(blockExpiration <= maxBlockExpiration,
             "Block Expiration must less than max block expiration"
         );
 
-        Order storage newOrder = _orderOf[puzzle];
+        Order storage newOrder = orders[puzzle];
 
         require(newOrder.creator == address(0x0), "Puzzle already exist");
 
@@ -127,12 +111,12 @@ contract Remittance is Stoppable {
         bytes32 puzzle = generatePuzzle(msg.sender, password);
 
         // get order
-        require(_orderOf[puzzle].creator != address(0x0), "Order not available");
-        uint256 balance =_orderOf[puzzle].amount;
+        require(orders[puzzle].creator != address(0x0), "Order not available");
+        uint256 balance =orders[puzzle].amount;
         require(balance > 0, "Order is empty");
 
-        _orderOf[puzzle].amount = 0;
-        _orderOf[puzzle].expiredBlock = 0;
+        orders[puzzle].amount = 0;
+        orders[puzzle].expiredBlock = 0;
 
         // event
         emit ClaimOrderEvent(puzzle, msg.sender, balance, password);
@@ -145,7 +129,7 @@ contract Remittance is Stoppable {
     function cancelOrder(bytes32 puzzle) public runningOnly
     {
         // get order
-        Order memory order = _orderOf[puzzle];
+        Order memory order = orders[puzzle];
 
         require(order.creator == msg.sender,
             "Only order creator to cancel order"
@@ -160,8 +144,8 @@ contract Remittance is Stoppable {
         // event
         emit CancelOrderEvent(puzzle, msg.sender);
 
-        _orderOf[puzzle].amount = 0;
-        _orderOf[puzzle].expiredBlock = 0;
+        orders[puzzle].amount = 0;
+        orders[puzzle].expiredBlock = 0;
 
         // refund
         msg.sender.transfer(order.amount);
