@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <link
+      href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T"
+      crossorigin="anonymous"
+    />
+    <style>
+      .control-label {
+        font-weight: bold;
+      }
+    </style>
+    <title>Document</title>
+  </head>
+  <body class="container">
+    <h1>Splitter</h1>
+    <div id="alertContainer" class="alert" style="display:none">
+      <strong>Success!</strong> You should
+      <a href="#" class="alert-link">read this message</a>.
+    </div>
+    <div id="myApp" class="row">
+      <div class="col-sm-12 col-md-6">
+        <div class="card">
+          <div class="card-header">Asign Your Ether</div>
+          <div class="card-body">
+            <form>
+              <div class="form-group">
+                <label class="control-label" for="amount">Amount</label>
+                <input
+                  id="txtAmount"
+                  type="number"
+                  class="form-control"
+                  min="0"
+                  value="0"
+                  placeholder="Split Amount"
+                  required
+                  value="1"
+                />
+              </div>
+              <div class="form-group">
+                <label for="txtReceiver" class="control-label">Receiver</label
+                ><input
+                  type="text"
+                  class="form-control"
+                  id="txtReceiver"
+                  placeholder="Receiver Address"
+                  required
+                  value=""
+                />
+              </div>
+              <div class="form-group">
+                <label class="control-label" for="txtBlockExpiration"
+                  >Expire in (blocks)</label
+                >
+                <input
+                  id="txtBlockExpiration"
+                  type="number"
+                  class="form-control"
+                  min="0"
+                  max="1000"
+                  placeholder="block expiration"
+                  required
+                  value="500"
+                />
+              </div>
+              <div class="form-group">
+                <label for="txtPassword" class="control-label">Password</label>
+                <div class="input-group">
+                  <input
+                    type="password"
+                    class="form-control"
+                    id="txtPassword"
+                    placeholder="Password"
+                    required
+                    value=""
+                    minlength="10"
+                    maxlength="32"
+                  />
+                  <div class="input-group-prepend">
+                    <button
+                      type="button"
+                      id="btnShow"
+                      class="input-group-text btn btn-sm btn-info"
+                    >
+                      show
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="form-group">
+                <labe class="control-label" for="lblPuzzle"
+                  >Please remember this puzzle</labe
+                >
+                <div class="form-text" id="lblPuzzle"></div>
+              </div>
+              <button type="button" id="btnAssign" class="btn btn-primary">
+                Assign
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <div id="assignStatus" class="alert alert-info"></div>
+      </div>
+      <div class="col-sm-12 col-md-6">
+        <form>
+          <div class="card">
+            <div class="card-header">Info</div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-12">
+                  <div class="form-group">
+                    <label for="txtPuzzleCreator" class="control-label"
+                      >Creator</label
+                    >
+                    <div class="form-text" id="txtPuzzleCreator"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="col-6">
+                  <div class="form-group">
+                    <label for="txtPuzzleAmount" class="control-label"
+                      >Amount</label
+                    >
+                    <div class="form-text" id="txtPuzzleAmount"></div>
+                  </div>
+                </div>
+                <div class="col-6">
+                  <div class="form-group">
+                    <label for="txtPuzzleExpiredBlock" class="control-label"
+                      >Expired Block</label
+                    >
+                    <div class="form-text" id="txtPuzzleExpiredBlock"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card-header">Claim Fund</div>
+            <div class="card-body">
+              <div class="form-group" id="pnlPassword">
+                <label for="txtPuzzlePassword" class="control-label"
+                  >Your Password</label
+                >
+                <div class="input-group">
+                  <input
+                    type="password"
+                    class="form-control"
+                    id="txtPuzzlePassword"
+                    placeholder="Password"
+                    required
+                    value=""
+                    minlength="10"
+                    maxlength="32"
+                  />
+                  <div class="input-group-prepend">
+                    <button
+                      type="button"
+                      id="btnPuzzlePWShow"
+                      class="input-group-text btn btn-sm btn-info"
+                    >
+                      show
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <button type="button" id="btnClaim" class="btn btn-success">
+                Claim
+              </button>
+            </div>
+
+            <div class="card-header">Cancel Fund</div>
+            <div class="card-body">
+              <div class="form-group">
+                <label for="txtPuzzle" class="control-label">Puzzle</label
+                ><input type="text" class="form-control" id="txtPuzzle" />
+              </div>
+              <button type="button" id="btnCancel" class="btn btn-warning">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </form>
+        <div id="withdrawStatus" class="alert alert-info"></div>
+      </div>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>
