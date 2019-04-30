@@ -152,6 +152,12 @@ contract("Remittance", accounts => {
     const contractBalance = toBN(await web3.eth.getBalance(instance.address));
     // owner balance
     const ownerBalance = toBN(await web3.eth.getBalance(contractOwner));
+    // pause contract
+    const txObjPause = await instance.pause({
+      from: contractOwner
+    });
+    // status
+    assert.isTrue(txObjPause.receipt.status, "transaction status must be true");
     // kill contract
     const txObj = await instance.kill({
       from: contractOwner

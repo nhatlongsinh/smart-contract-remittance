@@ -55,7 +55,27 @@ contract("Remittance Forbidden", accounts => {
       });
     }, maxGas);
   });
-
+  it("should forbid to call pause when already paused", async () => {
+    //create paused contract
+    instance = await Remittance.new(false, maxBlockExpiration, {
+      from: contractOwner
+    });
+    await expectedExceptionPromise(function() {
+      return instance.pause({
+        from: contractOwner,
+        gas: maxGas
+      });
+    }, maxGas);
+  });
+  it("should forbid to call resume when already running", async () => {
+    // resume
+    await expectedExceptionPromise(function() {
+      return instance.resume({
+        from: contractOwner,
+        gas: maxGas
+      });
+    }, maxGas);
+  });
   it("should forbid to call stoppable", async () => {
     // pause
     await expectedExceptionPromise(function() {
@@ -72,7 +92,14 @@ contract("Remittance Forbidden", accounts => {
       });
     }, maxGas);
   });
-
+  it("should forbid to call kill when running", () => {
+    return expectedExceptionPromise(function() {
+      return instance.kill({
+        from: contractOwner,
+        gas: maxGas
+      });
+    }, maxGas);
+  });
   it("should forbid to call kill", () => {
     return expectedExceptionPromise(function() {
       return instance.kill({

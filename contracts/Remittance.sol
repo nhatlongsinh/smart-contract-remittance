@@ -8,14 +8,6 @@ contract Remittance is Stoppable {
     // library
     using SafeMath for uint;
 
-    // ENUM
-    // order status
-    // Not_Set: null
-    // Available: ready to send out
-    // Cancelled: refunded to the owner, cancel order
-    // Claimed: claimed by receiver
-    enum OrderStatus {Not_Set, Available, Claimed, Cancelled}
-
     // STRUCT
     // order
     struct Order {

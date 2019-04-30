@@ -23,6 +23,11 @@ contract Stoppable is Owned {
     _;
   }
   
+  modifier pauseOnly() {
+    require(!_isRunning, "Contract is running");
+    _;
+  }
+  
   // GETTER
   // running
   function isRunning() public view returns (bool) {
@@ -33,6 +38,7 @@ contract Stoppable is Owned {
   function pause()
     public
     ownerOnly
+    runningOnly
   {
     _isRunning = false;
     emit ContractPaused(msg.sender);
@@ -41,6 +47,7 @@ contract Stoppable is Owned {
   function resume()
     public
     ownerOnly
+    pauseOnly
   {
     _isRunning = true;
     emit ContractResumed(msg.sender);
@@ -49,9 +56,10 @@ contract Stoppable is Owned {
   function kill()
     public
     ownerOnly
+    pauseOnly
   {
     emit ContractKilled(msg.sender);
     // send all balance to contract owner
-    selfdestruct(_owner);
+    selfdestruct(getOwner());
   }
 }

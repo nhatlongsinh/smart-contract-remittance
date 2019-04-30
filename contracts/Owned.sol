@@ -2,7 +2,7 @@ pragma solidity >=0.4.21 <0.6.0;
 
 contract Owned {
   // owner
-  address payable internal _owner;
+  address payable private _owner;
 
   // event
   event OwnerChanged(
@@ -26,7 +26,7 @@ contract Owned {
   }
 
   // getter
-  function getOwner() public view returns (address) {
+  function getOwner() public view returns (address payable) {
     return _owner;
   }
 
