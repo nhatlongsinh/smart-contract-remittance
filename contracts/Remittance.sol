@@ -52,6 +52,7 @@ contract Remittance is Stoppable {
     // constructor
     constructor(bool isRunning, uint256 _maxBlockExpiration) public Stoppable(isRunning)
     {
+        require(_maxBlockExpiration > 0, "Max block expiration must greater than zero")
         maxBlockExpiration = _maxBlockExpiration;
     }
 
